@@ -6,7 +6,7 @@ import pandas as pd
 from astroquery.jplhorizons import Horizons
 from tqdm import tqdm
 
-def calculate_orbit(objects, initial_time_step=5000, min_time_step=2000, max_steps=1000001, tolerance=1e-6):
+def calculate_orbit(objects, initial_time_step=500, min_time_step=2000, max_steps=5000001, tolerance=1e-6):
       '''
       Calculate the orbit of multiple objects in 3D space.
       @param objects: A list of dictionaries, each containing the
@@ -21,7 +21,7 @@ def calculate_orbit(objects, initial_time_step=5000, min_time_step=2000, max_ste
             at which each object crosses the y-axis.
       '''
       # Definine G
-      G = 6.67430e-11  
+      g = 6.67430e-11  
 
       # Initialise arrays for each object
       positions = {obj['name']: {'x': np.zeros(max_steps), 'y': np.zeros(max_steps), 'z': np.zeros(max_steps)} for obj in objects}
@@ -33,8 +33,8 @@ def calculate_orbit(objects, initial_time_step=5000, min_time_step=2000, max_ste
             positions[obj['name']]['x'][0] = obj['initial_x']
             positions[obj['name']]['y'][0] = obj['initial_y']
             positions[obj['name']]['z'][0] = obj['initial_z']
-            velocities[obj['name']]['x'][0] = obj['initial_y_velocity']
-            velocities[obj['name']]['y'][0] = obj['initial_x_velocity']
+            velocities[obj['name']]['x'][0] = obj['initial_x_velocity']
+            velocities[obj['name']]['y'][0] = obj['initial_y_velocity']
             velocities[obj['name']]['z'][0] = obj['initial_z_velocity']
       
       time[0] = 0
@@ -42,7 +42,7 @@ def calculate_orbit(objects, initial_time_step=5000, min_time_step=2000, max_ste
       time_step = initial_time_step
       y_crossings = {obj['name']: [] for obj in objects}
       
-      for i in tqdm(range(0, max_steps-1), desc="Calculating orbits"):
+      for i in tqdm(range(0, max_steps-1), desc="Calculating orbits", mininterval=1.0):
             for obj in objects:
                   name = obj['name']
                   #radius = np.sqrt(positions[name]['x'][i]**2 + positions[name]['y'][i]**2 + positions[name]['z'][i]**2)
@@ -58,9 +58,9 @@ def calculate_orbit(objects, initial_time_step=5000, min_time_step=2000, max_ste
                               other_radius = np.sqrt((positions[other_obj['name']]['x'][i] - positions[name]['x'][i])**2 + 
                                                       (positions[other_obj['name']]['y'][i] - positions[name]['y'][i])**2 + 
                                                       (positions[other_obj['name']]['z'][i] - positions[name]['z'][i])**2)
-                              x_acceleration += -G * other_obj['mass'] * (positions[name]['x'][i] - positions[other_obj['name']]['x'][i]) / other_radius**3
-                              y_acceleration += -G * other_obj['mass'] * (positions[name]['y'][i] - positions[other_obj['name']]['y'][i]) / other_radius**3
-                              z_acceleration += -G * other_obj['mass'] * (positions[name]['z'][i] - positions[other_obj['name']]['z'][i]) / other_radius**3
+                              x_acceleration += -g * other_obj['mass'] * (positions[name]['x'][i] - positions[other_obj['name']]['x'][i]) / other_radius**3
+                              y_acceleration += -g * other_obj['mass'] * (positions[name]['y'][i] - positions[other_obj['name']]['y'][i]) / other_radius**3
+                              z_acceleration += -g * other_obj['mass'] * (positions[name]['z'][i] - positions[other_obj['name']]['z'][i]) / other_radius**3
                         
                   velocities[name]['x'][i+1] = velocities[name]['x'][i] + x_acceleration * time_step
                   velocities[name]['y'][i+1] = velocities[name]['y'][i] + y_acceleration * time_step
@@ -112,7 +112,7 @@ def plot_orbit(positions, formatting,img_name):
     ax2.legend(loc='upper right')
     
     plt.savefig(f'{img_name}.png')  # Save the plot as an image file
-    plt.show()
+    #plt.show()
 
 def calculate_orbital_periods(y_crossings):
     for name, crossings in y_crossings.items():
@@ -135,6 +135,18 @@ def calculate_orbital_periods(y_crossings):
             print(f"{name} - Average Period: {average_period:.2f} years, Standard Deviation: {std_dev_period:.2f} years")
         else:
             print(f"{name} - Not enough crossings to calculate period")
+
+def calculate_cloest_and_furthest_approach(positions):
+      for name, pos in positions.items():
+            distances = np.sqrt(pos['x']**2 + pos['y']**2 + pos['z']**2)
+            closest_approach = np.min(distances)
+            furthest_approach = np.max(distances)
+
+            #Convert to AU
+            closest_approach = closest_approach / 1.496e11
+            furthest_approach = furthest_approach / 1.496e11
+
+            print(f"{name} - Closest Approach: {closest_approach:.2e} AU, Furthest Approach: {furthest_approach:.2e} AU")
 
 def all_start_y_0():
       # Initial conditions for objects
@@ -173,11 +185,15 @@ def all_start_y_0():
       calculate_orbital_periods(y_crossings)
 
 def api_call():
+
+      au = 1.496e11  # 1 Astronomical Unit in meters
+      day_in_seconds = 24 * 3600  # Number of seconds in a day
       # Define the objects and their IDs in the JPL Horizons system along with the masses
       masses = {
       'Sun': 1.989e30,
       'Halleys_Comet': 2.2e14,
       'Mercury': 3.301e23,
+      'Moon': 7.34767309e22,
       'Venus': 4.867e24,
       'Earth': 5.972e24,
       'Mars': 6.417e23,
@@ -190,14 +206,15 @@ def api_call():
       objects_info = [
            # {'name': 'Mercury', 'id': '199'},
             {'name': 'Sun', 'id': '10'},
+            {'name': 'Moon', 'id': '301'},
             {'name': 'Halleys_Comet', 'id': '90000001'},
             #{'name': 'Venus', 'id': '299'},
             {'name': 'Earth', 'id': '399'},
-            #{'name': 'Mars', 'id': '499'},
+            {'name': 'Mars', 'id': '499'},
             {'name': 'Jupiter', 'id': '599'},
-            #{'name': 'Saturn', 'id': '699'},
-            #{'name': 'Uranus', 'id': '799'},
-            #{'name': 'Neptune', 'id': '899'}
+            {'name': 'Saturn', 'id': '699'},
+            {'name': 'Uranus', 'id': '799'},
+            {'name': 'Neptune', 'id': '899'}
       ]
 
       # Check if the CSV file exists
@@ -212,19 +229,21 @@ def api_call():
                   horizons_obj = Horizons(
                   id=obj['id'],
                   location='500@10',  # Centered on Sun
-                  epochs={'start': '2025-01-01', 'stop': '2025-01-02', 'step': '1d'}
+                  epochs={'start': '2024-04-01', 'stop': '2025-04-02', 'step': '1d'}
                   )
                   eph = horizons_obj.vectors() 
-                  
+
+                  print(masses[obj['name']])
                   obj_data = {
                   'name': obj['name'],
-                  'mass': masses[obj['name']] * 1000, #convert to grams .
-                  'initial_x': eph['x'][0],
-                  'initial_y': eph['y'][0],
-                  'initial_z': eph['z'][0],
-                  'initial_x_velocity': eph['vx'][0],
-                  'initial_y_velocity': eph['vy'][0],
-                  'initial_z_velocity': eph['vz'][0]
+                  'mass': masses[obj['name']], 
+                  'initial_x': eph['x'][0] * au,
+                  'initial_y': eph['y'][0] * au,
+                  'initial_z': eph['z'][0] * au,
+
+                  'initial_x_velocity': eph['vx'][0] * (au / day_in_seconds),
+                  'initial_y_velocity': eph['vy'][0] * (au / day_in_seconds),
+                  'initial_z_velocity': eph['vz'][0] * (au / day_in_seconds)
                   }
                   objects.append(obj_data)
             
@@ -251,6 +270,7 @@ def api_call():
 
       # Calculate orbital period for each object
       calculate_orbital_periods(y_crossings) 
+      calculate_cloest_and_furthest_approach(positions)
      
 
 if __name__ == "__main__":
