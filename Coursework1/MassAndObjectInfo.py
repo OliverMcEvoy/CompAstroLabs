@@ -19,14 +19,14 @@ def get_masses_and_object_info(example = 'solar_system'):
       'Uranus': 8.681e25,
       'Neptune': 1.024e26
       }
-      # custom formatting no harm alwasy returning this if i want a seperate one for each example then I can just override it. 
+      # Custom formatting no harm in setting this as a default and if I want a seperate one for an example then I can just override it. 
       formatting = {
-            'Sun': {'linewidth': 4, 'alpha': 1.0, 'color': 'yellow'},
-            'Halleys_Comet': {'linewidth': 0.5, 'alpha': 0.75, 'color': 'purple'},
+            'Sun': {'linewidth': 1, 'alpha': 1.0, 'color': 'yellow'},
+            'Halleys_Comet': {'linewidth': 1.5, 'alpha': 0.75, 'color': 'purple'},
             'Mercury': {'linewidth': 1, 'alpha': 0.75, 'color': 'gray'},
             'Venus': {'linewidth': 1, 'alpha': 0.75, 'color': 'orange'},
             'Earth': {'linewidth': 1, 'alpha': 0.75, 'color': 'green'},
-            'Moon': {'linewidth': 0.5, 'alpha': 0.75, 'color': 'gray'},
+            'Moon': {'linewidth': 0.5, 'alpha': 0.75, 'color': 'black'},
             'Mars': {'linewidth': 1, 'alpha': 0.75, 'color': 'red'},
             'Jupiter': {'linewidth': 1.5, 'alpha': 0.75, 'color': 'orange'},
             'Saturn': {'linewidth': 1.5, 'alpha': 0.75, 'color': 'gold'},
@@ -34,6 +34,8 @@ def get_masses_and_object_info(example = 'solar_system'):
             'Neptune': {'linewidth': 1.5, 'alpha': 0.75, 'color': 'blue'}
       }
 
+      # As Python does not have switch statements this will do for now.
+      # TODO Make this a disctionary or something this code makes me ashamed.      
       if example == 'solar_system':
             objects_info = [
             {'name': 'Mercury', 'id': '199'},
@@ -55,6 +57,12 @@ def get_masses_and_object_info(example = 'solar_system'):
             {'name': 'Earth', 'id': '399'},
             {'name': 'Moon', 'id': '301'},
             ]
+
+            formatting = {
+            'Sun': {'linewidth': 4, 'alpha': 1.0, 'color': 'yellow'},
+            'Moon': {'linewidth': 0.5, 'alpha': 0.5, 'color': 'black', 'linestyle': '-' },
+            'Earth': {'linewidth': 2, 'alpha': 0.5, 'color': 'green','linestyle': ':'},
+            }
       elif example == 'rocky_planets':
             objects_info = [
             {'name': 'Sun', 'id': '10'},
@@ -82,10 +90,19 @@ def get_masses_and_object_info(example = 'solar_system'):
             {'name': 'Uranus', 'id': '799'},
             {'name': 'Neptune', 'id': '899'}
             ]
+      elif example == 'just_comet':
+            objects_info = [
+            {'name': 'Sun', 'id': '10'},
+            {'name': 'Halleys_Comet', 'id': '90000001'},
+            ]
+            formatting = {
+            'Sun': {'linewidth': 2, 'alpha': 1, 'color': 'orange'},
+            'Halleys_Comet': {'linewidth': 2, 'alpha': 1, 'color': 'lightblue'},
+            }
 
       else:
             #Throw exception 
-            print('Nothing selected currently existing')
+            print('Nothing selected currently existing, Check MassAndObjectInfo.py for existing examples')
 
 
       return masses, objects_info, formatting

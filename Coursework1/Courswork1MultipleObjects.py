@@ -2,120 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
-import pandas as pd
+import pandas as pd # Just used to save csv for cacheing api call.
 from astroquery.jplhorizons import Horizons
-from tqdm import tqdm
 import argparse
 from MassAndObjectInfo import get_masses_and_object_info
-
-def calculate_orbit(objects, initial_time_step=3600, max_steps=8766):
-      '''
-      Calculate the orbit of multiple objects in 3D space.
-      @param objects: A list of dictionaries, each containing the
-            name, mass, initial x, y, z positions, initial
-            x, y, z velocities of an object.
-      @param initial_time_step: The initial time step for the simulation.
-      @param min_time_step: The minimum time step for the simulation.
-      @param max_steps: The maximum number of steps to simulate.
-      @param tolerance: The tolerance for the simulation.
-      @return: A dictionary containing the positions of each object
-            at each time step, the time at each step, and the time    
-            at which each object crosses the y-axis.
-      '''
-      # Definine G
-      g = 6.67430e-11  
-
-      # Initialise arrays for each object
-      positions = {obj['name']: {'x': np.zeros(max_steps), 'y': np.zeros(max_steps), 'z': np.zeros(max_steps)} for obj in objects}
-      velocities = {obj['name']: {'x': np.zeros(max_steps), 'y': np.zeros(max_steps), 'z': np.zeros(max_steps)} for obj in objects}
-      time = np.zeros(max_steps)
-      
-      # Object initial conditions
-      for obj in objects:
-            positions[obj['name']]['x'][0] = obj['initial_x']
-            positions[obj['name']]['y'][0] = obj['initial_y']
-            positions[obj['name']]['z'][0] = obj['initial_z']
-            velocities[obj['name']]['x'][0] = obj['initial_x_velocity']
-            velocities[obj['name']]['y'][0] = obj['initial_y_velocity']
-            velocities[obj['name']]['z'][0] = obj['initial_z_velocity']
-      
-      time[0] = 0
-
-      time_step = initial_time_step
-
-      # TODO Track radial velocity changes as a better indication of an orbit
-      previous_radial_velocity = {obj['name']: None for obj in objects}
-      radial_velocity_sign_changes = {obj['name']: [] for obj in objects}
-      y_crossings = {obj['name']: [] for obj in objects}
-      
-      for i in tqdm(range(0, max_steps-1), desc="Calculating orbits", mininterval=1.0):
-            for obj in objects:
-                  name = obj['name']
-                  # Radius not needed anymore
-                  # radius = np.sqrt(positions[name]['x'][i]**2 + positions[name]['y'][i]**2 + positions[name]['z'][i]**2)
-                  
-                  x_acceleration = 0
-                  y_acceleration = 0
-                  z_acceleration = 0
-
-                  # A bit much indentation but it'll do for now, but what this chunk does is calculate the acceleration of the object due to all other objects.
-                  for other_obj in objects:
-                        # Cursed check but itll do.
-                        if other_obj['name'] != name:
-                              other_radius = ((positions[other_obj['name']]['x'][i] - positions[name]['x'][i])**2 + 
-                                                      (positions[other_obj['name']]['y'][i] - positions[name]['y'][i])**2 + 
-                                                      (positions[other_obj['name']]['z'][i] - positions[name]['z'][i])**2) ** (0.5)
-                              x_acceleration += -g * other_obj['mass'] * (positions[name]['x'][i] - positions[other_obj['name']]['x'][i]) / other_radius**3
-                              y_acceleration += -g * other_obj['mass'] * (positions[name]['y'][i] - positions[other_obj['name']]['y'][i]) / other_radius**3
-                              z_acceleration += -g * other_obj['mass'] * (positions[name]['z'][i] - positions[other_obj['name']]['z'][i]) / other_radius**3
-                             
-                  # Update velocities and positions
-                  velocities[name]['x'][i+1] = velocities[name]['x'][i] + x_acceleration * time_step
-                  velocities[name]['y'][i+1] = velocities[name]['y'][i] + y_acceleration * time_step
-                  velocities[name]['z'][i+1] = velocities[name]['z'][i] + z_acceleration * time_step
-                  positions[name]['x'][i+1] = positions[name]['x'][i] + velocities[name]['x'][i+1] * time_step
-                  positions[name]['y'][i+1] = positions[name]['y'][i] + velocities[name]['y'][i+1] * time_step
-                  positions[name]['z'][i+1] = positions[name]['z'][i] + velocities[name]['z'][i+1] * time_step
-
-                  # Skip the Sun itself
-                  if name == 'Sun':
-                        continue
-
-                  # Calculate relative position and velocity with respect to the Sun
-                  sun_position = np.array([positions['Sun']['x'][i], positions['Sun']['y'][i], positions['Sun']['z'][i]])
-                  sun_velocity = np.array([velocities['Sun']['x'][i], velocities['Sun']['y'][i], velocities['Sun']['z'][i]])
-                  relative_position = np.array([positions[name]['x'][i], positions[name]['y'][i], positions[name]['z'][i]]) - sun_position
-                  relative_velocity = np.array([velocities[name]['x'][i], velocities[name]['y'][i], velocities[name]['z'][i]]) - sun_velocity
-
-                  # Calculate radial velocity relative to the Sun. Note the magnitude will be wrong as this is not normalised by radius but this will not change the sign which is what we are after!
-                  radial_velocity = (
-                        relative_position[0] * relative_velocity[0] +
-                        relative_position[1] * relative_velocity[1] +
-                        relative_position[2] * relative_velocity[2]
-                        )
-
-
-                  # Check for radial velocity sign change
-                  # I have tried to think of better ways of doing the is not None. None I can think off do not introduce more errors/save processing
-
-                  if previous_radial_velocity[name] is not None and radial_velocity * previous_radial_velocity[name] < 0:
-                        radial_velocity_sign_changes[name].append((time[i]))
-                  
-                  previous_radial_velocity[name] = radial_velocity
-
-                  # Check for y-axis crossing
-                  if positions[name]['y'][i] * positions[name]['y'][i+1] < 0:
-                        y_crossings[name].append(time[i])
-            
-            time[i+1] = time[i] + time_step
-
-      # Only return used values
-      return {name: {key: val[:i+1] for key, val in positions[name].items()} for name in positions}, time[:i+1], y_crossings,radial_velocity_sign_changes
+from CalculateOrbitRK import calculate_orbit_rk4
+from CalculateOrbitVelocityVerlet import calculate_orbit
+from multiprocessing import Pool
+import datetime
+import random
 
 
 def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False):
       
-      # 3D plot
       if just_3d:
             fig = plt.figure(figsize=(300,90))
             ax1 = fig.add_subplot(111,projection = '3d')
@@ -136,11 +35,11 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
             else:
                   pos_slice = pos  # If there are fewer than 1000 points, use all available points
             
-            fmt = formatting.get(name, {'linewidth': 0.5, 'alpha': 0.75, 'color': 'black'})  # Default formatting
+            fmt = formatting.get(name, {'linewidth': 0.5, 'alpha': 0.75, 'color': 'black'})  # Default formatting if for whatever reason none is passed in.
             ax1.plot(pos_slice['x'], pos_slice['y'], pos_slice['z'], label=name, **fmt)
             # Add marker at the last point
             if name == 'Sun':
-                  ax1.scatter(pos['x'][-1], pos['y'][-1], pos['z'][-1], color='yellow', s=100, edgecolor='k', zorder=5 ,alpha=1)
+                  ax1.scatter(pos['x'][-1], pos['y'][-1], pos['z'][-1], color='yellow', s=25, edgecolor='k', zorder=5 ,alpha=1)
 
             else :
                   ax1.scatter(pos['x'][-1], pos['y'][-1], pos['z'][-1], color=fmt['color'], s=25, edgecolor='k', zorder=5 ,alpha=0.8)
@@ -150,18 +49,18 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
       ax1.view_init(elev=10, azim=18)
       #Ensure the z doesnt look too weird
       ax1.set_aspect('equal')
-      cool_photo = True
-      if cool_photo:
+      if just_3d:
             ax1.grid(False)
-            ax1.set_xticks([])  # Remove x ticks
-            ax1.set_yticks([])  # Remove y ticks
-            ax1.set_zticks([])  # Remove z ticks
+            ax1.set_xticks([])
+            ax1.set_yticks([]) 
+            ax1.set_zticks([]) 
             ax1.xaxis.pane.fill = False
             ax1.yaxis.pane.fill = False
             ax1.zaxis.pane.fill = False
-            ax1.xaxis.line.set_color((1.0, 1.0, 1.0, 0.0))  # Hide x axis line
-            ax1.yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))  # Hide y axis line
-            ax1.zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))  # Hide z axis line
+            #Cant figure out how to hide so just setting colour to white
+            ax1.xaxis.line.set_color((1.0, 1.0, 1.0, 0.0)) 
+            ax1.yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+            ax1.zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))  
       else:
             ax1.set_xlabel('x (m)')
             ax1.set_ylabel('y (m)')
@@ -199,27 +98,66 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
       plt.show()
       plt.savefig(f'{img_name}.png') 
 
-def calculate_orbital_periods(y_crossings):
-    for name, crossings in y_crossings.items():
-        if len(crossings) > 1:
-            # Get the half-periods by taking the difference between consecutive crossings.
-            half_periods = [crossings[i+1] - crossings[i] for i in range(len(crossings) - 1)]
+def random_past_date(days_ago):
+    # Get the current date
+    current_date = datetime.datetime.now()
+    
+    # Generate a random number of days between 0 and days_ago
+    random_days = random.randint(0, days_ago)
+    
+    past_date = current_date - datetime.timedelta(days=random_days)
+    past_date_minus_one_day = past_date - datetime.timedelta(days=1)
+    
+    # Format the date as "YYYY-mm-dd"
+    formatted_date = past_date.strftime("%Y-%m-%d")
+    formatted_date_minus_one_day = past_date_minus_one_day.strftime("%Y-%m-%d")
+    return  formatted_date_minus_one_day , formatted_date
 
-            # Convert half-periods from seconds to years.
-            half_periods_in_years = [period / (365.25 * 24 * 3600) for period in half_periods]
-            
-            average_half_period = np.mean(half_periods_in_years)
-            std_dev_half_period = np.std(half_periods_in_years)
-            
-            # Half to full.
-            average_period = average_half_period * 2
-            std_dev_period = std_dev_half_period * 2
-            
-            print(f"{name} - Average Period: {average_period:.2f} years, Standard Deviation: {std_dev_period:.2f} years")
-        else:
-            print(f"{name} - Not enough crossings to calculate period")
+def calculate_orbital_periods(crossings, bootstrapping):
+      # TODO Not sure if needed but the days in a year is not exactly 365.25
+      # But will it make a differnce taking account of it as a leap year is only skipped each 100 years (but not when divisible by 400)...
 
-def calculate_cloest_and_furthest_approach(positions):
+      average_periods = {}
+      halleys_periods = []
+            
+
+      for name, crossings in crossings.items():
+            if len(crossings) > 1:
+                  # Get the half-periods by taking the difference between consecutive crossings.
+                  half_periods = [crossings[i+1] - crossings[i] for i in range(len(crossings) - 1)]
+
+                  # Convert half-periods from seconds to full periods in years.
+                  period_in_years = [period * 2 / (365.25 * 24 * 3600) for period in half_periods]
+
+                  if (name == 'Halleys_Comet'):
+                        i = 1
+                        for period in period_in_years:
+                              halleys_periods.append(period)
+                              if bootstrapping == False:
+                                    #Im lazy and this alows me to copy and paste into latex directly 
+                                    print(f"{i}, & {period} \\\\")
+
+                              i += 1
+                  
+                  average_period = np.mean(period_in_years)
+                  average_periods[name] = average_period
+                  std_dev_period = np.std(period_in_years)
+                  
+                  # Half to full.
+                  average_period = average_period 
+                  std_dev_period = std_dev_period 
+                  
+                  #print(f"{name} - Average Period: {average_period:.2f} years, Standard Deviation: {std_dev_period:.2f} years")
+                  if bootstrapping == False:
+                        print(f"{name} % {average_period:.2f} % {std_dev_period:.2f} \\\\")
+
+            else:
+                  if bootstrapping == False:
+                        print(f"{name} - Not enough crossings to calculate period")
+      
+      return average_periods, halleys_periods
+
+def calculate_cloest_and_furthest_approach(positions,bootstrapping):
       for name, pos in positions.items():
             distances = np.sqrt(pos['x']**2 + pos['y']**2 + pos['z']**2)
             closest_approach = np.min(distances)
@@ -228,15 +166,48 @@ def calculate_cloest_and_furthest_approach(positions):
             #Convert to AU
             closest_approach = closest_approach / 1.496e11
             furthest_approach = furthest_approach / 1.496e11
-
-            print(f"{name} - Closest Approach: {closest_approach:.2e} AU, Furthest Approach: {furthest_approach:.2e} AU")
-
-
-#TODO I should probably move this to a seperate file or a class but cba rn.
+            
+            if bootstrapping == False:
+                  print(f"{name} - Closest Approach: {closest_approach:.2e} AU, Furthest Approach: {furthest_approach:.2e} AU")
 
 
-def api_call(example,time_step,total_steps,plot_count,three_d_graph_only):
+def analyse_bootstrap_results(bootstrap_results):
 
+      # Extract values
+      named_values = {}
+      halley_values = []
+
+      for entry in bootstrap_results:
+            obj_dict, halley_period_list, _, _ = entry  # Extract the dictionary and unnamed list
+
+            # Store named object values
+            for key, value in obj_dict.items():
+                  named_values.setdefault(key, []).append(value)
+
+            # Ensure halley_values list is long enough. I dislike while loops but its late and this works 
+            while len(halley_values) < len(halley_period_list):
+                  halley_values.append([])
+
+            # Append values by index
+            for i, val_list in enumerate(halley_period_list):
+                  halley_values[i].extend(val_list)
+
+      # Get the final values for each bit cursed but it works.
+      final_stats = {key: (np.mean(vals), np.std(vals)) for key, vals in named_values.items()}
+
+      # Step 3: Extract and compute statistics for unnamed values (if any)
+      halley_stats = [(i + 1, np.mean(vals), np.std(vals)) for i, vals in enumerate(halley_values)]
+
+
+      # Print the final results
+      # Print results in LaTeX-style format
+      for key, (mean, std) in final_stats.items():
+            print(f"{key} & {mean:.4f} & {std:.12f} \\\\")
+
+      for index, mean, std in halley_stats:
+            print(f"{index} & {mean:.2f} & {std:.2f} \\\\")
+
+def main(example,time_step,total_steps,plot_count,three_d_graph_only,method,output_img, bootstrapping = False):
 
       masses, objects_info, formatting = get_masses_and_object_info(example)
 
@@ -247,22 +218,31 @@ def api_call(example,time_step,total_steps,plot_count,three_d_graph_only):
 
       # Check if the CSV file exists
       csv_file = 'objects_data.csv'
-      if os.path.exists(csv_file):
+      if os.path.exists(csv_file) and bootstrapping == False:
             # Load data from CSV
             print('CSV file already exists, loading data from CSV. NOTE if you have changed the example use the --refresh flag to rewrite the csv')
             objects = pd.read_csv(csv_file).to_dict(orient='records')
       else:
+            if bootstrapping is not False:
+                  # Get a random date in the past 5 years to allow for different initial starting conditions of the model to see how the physics change!
+                  start_date,end_date = random_past_date(5*365)
+            else:
+                  start_date,end_date = '2024-03-17','2024-03-18'
+
+
+
             # If the CSV does not exist, fetch data from the api
             objects = []
             for obj in objects_info:
                   horizons_obj = Horizons(
                   id=obj['id'],
-                  location='500@0',  # Centered on Sun
-                  epochs={'start': '2024-04-01', 'stop': '2025-04-02', 'step': '1d'}
+                  location='500@0',  # Centered on Sun @399 to be centered on earth
+                  # St patricks day is as good as any to get data from 
+                  epochs={'start': start_date, 'stop': end_date, 'step': '1d'}
                   )
-                  eph = horizons_obj.vectors() 
+                  # Extract the stuff I want 
+                  eph = horizons_obj.vectors()
 
-                  print(masses[obj['name']])
                   obj_data = {
                   'name': obj['name'],
                   'mass': masses[obj['name']], 
@@ -279,17 +259,41 @@ def api_call(example,time_step,total_steps,plot_count,three_d_graph_only):
             # Save data to CSV as I dont wanna make more API calls than I need to 
             pd.DataFrame(objects).to_csv(csv_file, index=False)
 
-      positions, time, y_crossings , radial_velocity_changes = calculate_orbit(objects,time_step,total_steps)
-      plot_orbit(positions, formatting, 'plot_actual_data',plot_count,three_d_graph_only)
+      if bootstrapping == False:
+            print(f"Method is {method}" )
 
-      print('Periods using y crossings')
-      calculate_orbital_periods(y_crossings) 
-      print()
-      print('Periods using radiual velcoity changes')
-      calculate_orbital_periods(radial_velocity_changes)
-      print()
-      print('cloests approaches')
-      calculate_cloest_and_furthest_approach(positions)
+      if method == "both" or method =="rk":
+            positions_rk, time, y_crossings_rk , radial_velocity_changes_rk = calculate_orbit_rk4(objects,time_step,total_steps)
+
+            print('RK Method')
+            calculate_orbital_periods(y_crossings_rk,bootstrapping) 
+            rk_avgerage_periods , rk_halley_periods = calculate_orbital_periods(radial_velocity_changes_rk,bootstrapping)
+            calculate_cloest_and_furthest_approach(positions_rk,bootstrapping)
+
+      if method == "both" or method == "vv":
+
+            positions_euler, time, y_crossings_euler , radial_velocity_changes_euler = calculate_orbit(objects,time_step,total_steps)
+
+            calculate_orbital_periods(y_crossings_euler,bootstrapping) 
+            vv_average_periods , vv_halley_periods = calculate_orbital_periods(radial_velocity_changes_euler,bootstrapping)
+            calculate_cloest_and_furthest_approach(positions_euler,bootstrapping)
+
+      # Becuase of the nature of Matplotlib with vs code the code will pause while an image is able to be viewed, I want to be able to run my code and do something once its ran and be back once ONLY its all ran. 
+      # Having the plotting seperatly allows this while also making sure 
+
+      if bootstrapping:
+            if method == "rk":
+                  return rk_avgerage_periods ,rk_halley_periods ,  False, False
+            if method == "vv":
+                  return vv_average_periods, vv_halley_periods , False , False
+            if method == "both":
+                  return rk_avgerage_periods,rk_halley_periods ,vv_average_periods ,vv_halley_periods
+
+
+      if method == "both" or method == "rk":
+            plot_orbit(positions_rk, formatting,output_img + '_rk' ,plot_count,three_d_graph_only)
+      if method == "both" or method =="vv":
+            plot_orbit(positions_euler, formatting,output_img + '_vv',plot_count,three_d_graph_only)
      
 
 if __name__ == "__main__":
@@ -298,13 +302,29 @@ if __name__ == "__main__":
             description="Simulate solar system"
       )
       parser.add_argument("--refresh", action="store_true", help="Delete current CSV ")
-      parser.add_argument("--single_graph", action="store_true", help="Delete current CSV ")
+      parser.add_argument("--single_graph", action="store_true", help="Just a single pretty 3D grpah ")
+      parser.add_argument("--vv" ,  action="store_true", help="Euler method")
+      parser.add_argument("--both" , action="store_true", help="both RK and Euler")
 
       parser.add_argument(
             "--example",
             type=str,
             default="solar_system",
             help="Show an exmaple system, currently implemented 'solar_system' and 'earth_and_moon'",
+      )
+
+      parser.add_argument(
+            "--bootstrap_count",
+            type= int,
+            default=0,
+            help = "work out uncertainity via bootstraping, This technique is taking a random value between the given uncertainities of any of the provided values and seeing how the simulation differs"
+      )
+
+      parser.add_argument(
+            "--thread_count",
+            type=int,
+            default=0,
+            help="Select how many threads you want the bootstrapping to run on"
       )
 
       parser.add_argument(
@@ -326,18 +346,44 @@ if __name__ == "__main__":
             default=1000,
             help="How many points should be plotted in the diagram"
       )
-
+      parser.add_argument(
+            "--output_file_name",
+            type= str,
+            default="output_img",
+            help="specify name of the image, note: dont specify file type as that is handelled by the code itself"
+      )
 
       args = parser.parse_args()
 
-      # convert years to max time interval.
+      if args.bootstrap_count >  0 and args.thread_count <  0:
+            raise Exception( " When using bootstrapping please ensure the amount of threads the process will run on is specified. do this with the --thread_count flag e.g --thread_count 4 (if your unsure what this means just go for 8 and if your computer chugs reduce this as needed)")
+
+      # Convert years to the amount of intervals needed based on the time_step.
       # Takes how many seconds in a year and divies by the time step to get how many time steps in the given year. the plus one is purely for the tqdm loading bar to look nicer.
       total_steps = int(args.time_total*3600*24*365/args.time_step) + 1
+
+      if (args.vv):
+            method = "vv"
+      elif (args.both):
+            method = "both"
+      else:
+            method = "rk"
 
       if args.refresh:
             # Delete existing CSV if it exists
             if os.path.exists('objects_data.csv'):
                   os.remove('objects_data.csv')
+      if args.bootstrap_count == 0:
+            main(args.example,args.time_step,total_steps,args.plot_count,args.single_graph,method,args.output_file_name)
+      else:
+            print("Using a bootstrap method to get uncertainties, Might take a while. Note if the API call has a 503 error you have made too many requests, lower the thread count or bootstrap_count( or even decrease the time step to reduce time between api calls ).")
+            with Pool(args.thread_count) as pool:
+                  bootstrap_results = pool.starmap(main,[
+                        (
+                        args.example,args.time_step,total_steps,args.plot_count,args.single_graph,method,args.output_file_name,True             
+                        ) for i in range (0,args.bootstrap_count)
+                  ])
+            
+            analyse_bootstrap_results(bootstrap_results)
 
-      api_call(args.example,args.time_step,total_steps,args.plot_count,args.single_graph)
  

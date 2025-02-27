@@ -4,7 +4,7 @@ this one generates solar system for a year
 /home/omcevoy/Documents/CompAstroLabs/.venv~/bin/python /home/omcevoy/Documents/CompAstroLabs/Coursework1/Courswork1MultipleObjects.py --refresh --example solar_system --time_step 3600 --time_total 1 --plot_count 1000 --single_graph
 
 
-
+python3.13  Coursework1/Courswork1MultipleObjects.py --refresh --example solar_system --time_step 3600 --time_total 5 --plot_count 1000 --single_graph
 
 
 
