@@ -111,7 +111,7 @@ def calculate_orbit(objects, initial_time_step=3600, max_steps=8766):
                   if positions[name]['y'][i] * positions[name]['y'][i+1] < 0:
                         y_crossings[name].append(time[i])
             
-            time[i+1] = time[i] + time_step
+            time[i+1] = time[i] + time_step # Update the time again 
 
       # Only return used values
       return {name: {key: val[:i+1] for key, val in positions[name].items()} for name in positions}, time[:i+1], y_crossings,radial_velocity_sign_changes

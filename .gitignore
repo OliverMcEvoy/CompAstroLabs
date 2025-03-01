@@ -1,4 +1,7 @@
 docker/*
 .venv/*
 .ven*
-Coursework1/__pycache_*
+Coursework1/__pycache*
+*__pycache*
+*png
+*.csv

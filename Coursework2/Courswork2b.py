@@ -6,7 +6,7 @@ import pandas as pd # Just used to save csv for cacheing api call.
 from astroquery.jplhorizons import Horizons
 import argparse
 from MassAndObjectInfo import get_masses_and_object_info
-from CalculateOrbitRK import calculate_orbit_rk4
+from CalculateOrbitCenterOfMass import calculate_orbit_com
 from CalculateOrbitVelocityVerlet import calculate_orbit
 from AnalyseBootstrapResults import analyse_bootstrap_results
 from multiprocessing import Pool
@@ -62,7 +62,7 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
             ax1.yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
             ax1.zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))  
       else:
-            ax1.legend(loc='upper right')
+            ax1.legend(loc='upper left')
             ax1.set_xlabel('x (m)')
             ax1.set_ylabel('y (m)')
             ax1.set_zlabel('z (m)')
@@ -96,8 +96,8 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
 
       ax2.legend(loc='upper right')
       
-      plt.show()
       plt.savefig(f'{img_name}.png') 
+      plt.show()
 
 def random_past_date(days_ago):
     # Get the current date
@@ -225,16 +225,16 @@ def main(example,time_step,total_steps,plot_count,three_d_graph_only,method,outp
                   'initial_z_velocity': eph['vz'][0] * (au / day_in_seconds)
                   }
                   objects.append(obj_data)
-            
+
             # Save data to CSV as I dont wanna make more API calls than I need to 
             pd.DataFrame(objects).to_csv(csv_file, index=False)
 
       if bootstrapping == False:
             print(f"Method is {method}" )
 
-      if method == "both" or method =="rk":
+      if method == "both" or method =="com":
             #Do the calculations to process the system
-            positions_rk, time, y_crossings_rk , radial_velocity_changes_rk = calculate_orbit_rk4(objects,time_step,total_steps)
+            positions_rk, time, y_crossings_rk , radial_velocity_changes_rk = calculate_orbit_com(objects,time_step,total_steps)
             calculate_orbital_periods(y_crossings_rk,bootstrapping) 
             rk_avgerage_periods , rk_halley_periods = calculate_orbital_periods(radial_velocity_changes_rk,bootstrapping)
             rk_earth_halley_appraoches  = calculate_closest_and_furthest_approach_between_earth_and_halleys_comet(positions_rk,time,bootstrapping)
@@ -247,12 +247,12 @@ def main(example,time_step,total_steps,plot_count,three_d_graph_only,method,outp
             vv_average_periods , vv_halley_periods = calculate_orbital_periods(radial_velocity_changes_euler,bootstrapping)
             vv_earth_halley_appraoches  = calculate_closest_and_furthest_approach_between_earth_and_halleys_comet(positions_euler,time,bootstrapping)
 
+
       # Becuase of the nature of Matplotlib with vs code the code will pause while an image is able to be viewed, I want to be able to run my code and do something once its ran and be back once ONLY its all ran. 
       # Having the plotting seperatly allows this while also making sure 
-
       # If the bootstrapping method is used these are the results that need returned for further processing, False is used for if the result should not be processes
       if bootstrapping:
-            if method == "rk":
+            if method == "com":
                   return start_date , rk_avgerage_periods ,rk_halley_periods,rk_earth_halley_appraoches,False ,  False, False
             if method == "vv":
                   return start_date , vv_average_periods, vv_halley_periods , vv_earth_halley_appraoches, False , False , False
@@ -260,8 +260,8 @@ def main(example,time_step,total_steps,plot_count,three_d_graph_only,method,outp
                   return start_date ,rk_avgerage_periods,rk_halley_periods ,rk_earth_halley_appraoches,vv_average_periods ,vv_halley_periods, vv_earth_halley_appraoches
 
       # If a user is boot strapping to find values it is unlikely theywant a large amount of graphs produced
-      if method == "both" or method == "rk":
-            plot_orbit(positions_rk, formatting,output_img + '_rk' ,plot_count,three_d_graph_only)
+      if method == "both" or method == "com":
+            plot_orbit(positions_rk, formatting,output_img + '_com' ,plot_count,three_d_graph_only)
       if method == "both" or method =="vv":
             plot_orbit(positions_euler, formatting,output_img + '_vv',plot_count,three_d_graph_only)
      
@@ -274,7 +274,7 @@ if __name__ == "__main__":
       parser.add_argument("--refresh", action="store_true", help="Delete current CSV ")
       parser.add_argument("--single_graph", action="store_true", help="Just a single pretty 3D grpah ")
       parser.add_argument("--vv" ,  action="store_true", help="Euler method")
-      parser.add_argument("--both" , action="store_true", help="both RK and Euler")
+      parser.add_argument("--both" , action="store_true", help="both Center of mass and Velocity Verlet")
 
       parser.add_argument(
             "--example",
@@ -337,7 +337,7 @@ if __name__ == "__main__":
       elif (args.both):
             method = "both"
       else:
-            method = "rk"
+            method = "com"
 
       if args.refresh:
             # Delete existing CSV if it exists

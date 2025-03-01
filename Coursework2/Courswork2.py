@@ -96,8 +96,8 @@ def plot_orbit(positions, formatting, img_name, resolution=1000,just_3d = False)
 
       ax2.legend(loc='upper right')
       
-      plt.show()
       plt.savefig(f'{img_name}.png') 
+      plt.show()
 
 def random_past_date(days_ago):
     # Get the current date
@@ -206,7 +206,7 @@ def main(example,time_step,total_steps,plot_count,three_d_graph_only,method,outp
             for obj in objects_info:
                   horizons_obj = Horizons(
                   id=obj['id'],
-                  location='500@10',  # Centered on Sun @399 to be centered on earth
+                  location='500@0',  # Centered on Sun @399 to be centered on earth
                   # St patricks day is as good as any to get data from 
                   epochs={'start': start_date, 'stop': end_date, 'step': '1d'}
                   )
