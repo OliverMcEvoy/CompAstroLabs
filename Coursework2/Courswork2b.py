@@ -380,9 +380,14 @@ def main(
 
     # If a user is boot strapping to find values it is unlikely theywant a large amount of graphs produced
     if method == "both" or method == "com":
-        if animate_orbits:
+        if animate_orbits > 0:
             animate_orbit(
-                positions_rk, formatting, output_img + "_com", plot_count, 144, 45
+                positions_rk,
+                formatting,
+                output_img + "_com",
+                plot_count,
+                144,
+                animate_orbits,
             )
         else:
             plot_orbit(
@@ -413,7 +418,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--both", action="store_true", help="both Center of mass and Velocity Verlet"
     )
-    parser.add_argument("--animate_orbit", action="store_true", help="animate orbit ")
+    parser.add_argument(
+        "--animate_orbit",
+        type=int,
+        default=0,
+        help="animate orbit, specify the duration of the animation as a parameter ",
+    )
 
     parser.add_argument(
         "--collision_velocity",

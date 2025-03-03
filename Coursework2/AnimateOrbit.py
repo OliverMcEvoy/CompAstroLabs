@@ -59,13 +59,13 @@ def animate_orbit(
         lines[name] = (line, marker_pos)  # Store line and marker positions
         markers[name] = (marker, marker_pos)
 
-    # Auto-scaling the axis limits for the first 1000 points
-    all_x = np.concatenate([pos["x"][:1000] for pos in positions.values()])
-    all_y = np.concatenate([pos["y"][:1000] for pos in positions.values()])
-    all_z = np.concatenate([pos["z"][:1000] for pos in positions.values()])
-    ax.set_xlim(np.min(all_x), np.max(all_x))
-    ax.set_ylim(np.min(all_y), np.max(all_y))
-    ax.set_zlim(np.min(all_z), np.max(all_z))
+    # Auto-scaling the axis limits for the first 10000 points
+    all_x = np.concatenate([pos["x"][:10000] for pos in positions.values()])
+    all_y = np.concatenate([pos["y"][:10000] for pos in positions.values()])
+    all_z = np.concatenate([pos["z"][:10000] for pos in positions.values()])
+    ax.set_xlim(np.min(all_x), np.max(all_x) * 1.5)
+    ax.set_ylim(np.min(all_y), np.max(all_y) * 1.5)
+    ax.set_zlim(np.min(all_z), np.max(all_z) * 1.5)
 
     ax.set_aspect("equal")
     ax.grid(False)
